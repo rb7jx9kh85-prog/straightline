@@ -264,8 +264,13 @@ kbd {
 }
 .sl-btn-primary.running { background: linear-gradient(135deg, #6e2b22, #c8553d); color: var(--ivoire); }
 .sl-btn-ghost { background: transparent; }
-.sl-btn-speaker.speaker-prospect { border-color: var(--ambre); color: var(--ambre); }
-.sl-btn-speaker.speaker-moi { border-color: var(--vert); color: var(--vert); }
+.sl-btn-talk { border-color: var(--ambre); color: var(--ambre); touch-action: none; user-select: none; }
+.sl-btn-talk.talking { background: linear-gradient(135deg, #2f5a3a, #5fae7a); color: #06170c; border-color: transparent; }
+.sl-hint-live {
+  margin: 2px 0 0; font-size: 0.8rem; line-height: 1.45; color: var(--ivoire-2);
+  padding: 9px 12px; border-left: 2px solid var(--or); background: rgba(201,162,39,0.06); border-radius: 0 8px 8px 0;
+}
+.sl-hint-live strong { color: var(--or-clair); }
 .sl-shortcuts { margin: 2px 0 0; font-size: 0.76rem; color: var(--gris-fonce); }
 
 /* ---------- Réglages ---------- */

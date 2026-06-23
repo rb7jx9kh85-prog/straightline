@@ -8,9 +8,14 @@ const BUSINESS = [
 ];
 
 const PROVIDERS = [
+  { id: 'webspeech', label: 'Live · micro', hint: 'écoute le call (haut-parleur), FR — sans clé' },
+  { id: 'deepgram', label: 'Live · Deepgram', hint: 'diarization / audio de l\'onglet (clé requise)' },
   { id: 'simulation', label: 'Simulation', hint: 'tester sans appel réel' },
-  { id: 'webspeech', label: 'Web Speech', hint: 'micro navigateur (FR)' },
-  { id: 'deepgram', label: 'Deepgram', hint: 'diarization (clé requise)' },
+];
+
+const CAPTURE = [
+  { id: 'mic', label: '🎤 Micro (haut-parleur)' },
+  { id: 'tab', label: '🖥️ Audio de l\'onglet (le call)' },
 ];
 
 export default function SettingsPanel({
@@ -37,6 +42,24 @@ export default function SettingsPanel({
           })}
         </div>
       </div>
+
+      {settings.provider === 'deepgram' && (
+        <div className="sl-set-group">
+          <label className="sl-set-label">Source à capter</label>
+          <div className="sl-segmented">
+            {CAPTURE.map((c) => (
+              <button
+                key={c.id}
+                className={`sl-seg ${(settings.captureSource || 'mic') === c.id ? 'active' : ''}`}
+                onClick={() => onChange({ ...settings, captureSource: c.id })}
+                title={c.id === 'tab' ? "Partage l'onglet du call en cochant « Partager l'audio »" : 'Micro de l\'ordinateur'}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="sl-set-group">
         <label className="sl-set-label">Type de commerce du prospect</label>

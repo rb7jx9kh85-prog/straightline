@@ -17,7 +17,7 @@ PME** en Valais (Suisse romande). Suggestions **en français**, adaptées à ce 
 
 ```bash
 npm install
-cp .env.example .env        # renseigner ANTHROPIC_API_KEY
+cp .env.example .env        # renseigner OPENAI_API_KEY
 npx vercel dev              # front (Vite) + fonctions serverless /api ensemble
 ```
 
@@ -32,7 +32,7 @@ la déflexion puis les loops s'enchaîner.
 
 ## 🔐 Sécurité (non négociable)
 
-- **Aucune clé API dans le front.** `ANTHROPIC_API_KEY` et `DEEPGRAM_API_KEY` vivent uniquement
+- **Aucune clé API dans le front.** `OPENAI_API_KEY` et `DEEPGRAM_API_KEY` vivent uniquement
   dans les variables d'environnement serveur (fonctions `/api`).
 - Le navigateur ne parle qu'à **mon** backend. Pour Deepgram, le backend émet un **token éphémère**
   (30 s) ; la clé permanente ne quitte jamais le serveur.
@@ -58,7 +58,7 @@ Navigateur (React/Vite)
   │  au silence du prospect (VAD / fin d'énoncé) ──▶ POST /api/coach
   ▼
 /api/coach  (edge serverless — détient la clé)
-  │  system prompt (section 6) + 12-20 dernières répliques → Anthropic Messages API (stream)
+  │  system prompt (section 6) + 12-20 dernières répliques → OpenAI Chat Completions (stream)
   ▼
 Carte de conseil (glanceable) — phrase_a_dire en GROS (streaming) + tonalité + pourquoi + prochain coup
 ```
@@ -72,22 +72,33 @@ Carte de conseil (glanceable) — phrase_a_dire en GROS (streaming) + tonalité 
 
 ---
 
-## 🎚️ Sources audio (interface `SpeechProvider`)
+## 🎧 Mode Live — « écoute le call et dis-moi quoi répondre »
 
+L'app écoute en continu, et **dès que le prospect fait une pause** (~450 ms), elle déclenche
+automatiquement le coach : la phrase à dire s'écrit en direct. **Mains-libres** — rien à cliquer
+pendant que le prospect parle. Quand c'est ton tour, **maintiens le bouton « parler »** (ta voix
+est alors étiquetée `MOI` et ne déclenche pas de suggestion).
+
+Sources audio (interface `SpeechProvider`, dossier `src/lib/speech/`) :
+
+- **Live · micro** — micro du navigateur (Chrome), français, **zéro clé**. Mets le call sur
+  **haut-parleur** : le micro capte les deux voix. Le plus simple pour démarrer tout de suite.
+- **Live · Deepgram** — streaming WebSocket, français, **diarization** (sépare les locuteurs).
+  Deux captations possibles :
+  - 🎤 **Micro** (haut-parleur), ou
+  - 🖥️ **Audio de l'onglet** : partage l'onglet de ton call web (Google Meet, WhatsApp Web…) en
+    cochant « Partager l'audio » → SL Copilot écoute **la vraie voix du prospect**, pas seulement
+    le micro. Nécessite `DEEPGRAM_API_KEY` côté serveur.
 - **Simulation** — rejoue des scénarios d'objections. Zéro clé. Idéal pour tester latence + qualité.
-- **Web Speech** — micro du navigateur (Chrome), français, zéro clé. Le locuteur (Moi / Prospect)
-  se bascule au bouton ou à la touche **M** (push-to-talk logique), car Web Speech ne diarise pas.
-- **Deepgram** — option « propre » : streaming WebSocket, français, **diarization** (sépare les
-  locuteurs). Nécessite `DEEPGRAM_API_KEY` côté serveur.
-
-Changer de fournisseur n'impacte que le dossier `src/lib/speech/`.
 
 ---
 
 ## 🤖 Modèle LLM
 
-Par défaut : **`claude-haiku-4-5`** (faible latence, pour tenir le < 0,8 s). Pour un rendez-vous
-important où 0,3 s de plus est acceptable, mets `COACH_MODEL=claude-opus-4-8` côté serveur.
+Fournisseur : **OpenAI** (Chat Completions, en streaming, sortie JSON forcée).
+Par défaut : **`gpt-4o-mini`** (faible latence, pour tenir le < 0,8 s). Pour plus de finesse sur un
+rendez-vous important, mets `COACH_MODEL=gpt-4o` côté serveur. Endpoint compatible OpenAI
+(Azure, proxy) via `OPENAI_BASE_URL`.
 
 ---
 
@@ -102,8 +113,8 @@ important où 0,3 s de plus est acceptable, mets `COACH_MODEL=claude-opus-4-8` c
 ## ☁️ Déploiement (Vercel)
 
 1. Importer le repo sur Vercel.
-2. Variables d'environnement : `ANTHROPIC_API_KEY` (obligatoire), `COACH_MODEL` (optionnel),
-   `DEEPGRAM_API_KEY` (optionnel).
+2. Variables d'environnement : `OPENAI_API_KEY` (obligatoire), `COACH_MODEL` (optionnel),
+   `OPENAI_BASE_URL` (optionnel), `DEEPGRAM_API_KEY` (optionnel).
 3. Build auto (`vite build` → `dist`), fonctions `/api` en edge runtime. Aussi compatible Netlify.
 
 ---

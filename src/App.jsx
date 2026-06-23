@@ -23,7 +23,11 @@ const sleep = (ms, signal) =>
   });
 
 export default function App() {
-  const [settings, setSettings] = useState({ provider: 'simulation', businessType: 'restaurant' });
+  const [settings, setSettings] = useState({
+    provider: 'simulation',
+    businessType: 'restaurant',
+    captureSource: 'mic', // 'mic' (haut-parleur) | 'tab' (audio de l'onglet, Deepgram)
+  });
   const [status, setStatus] = useState('idle'); // idle | listening | speaking | thinking
   const [turns, setTurns] = useState([]);
   const [interim, setInterim] = useState(null); // { speaker, text }
@@ -43,6 +47,14 @@ export default function App() {
   const t0Ref = useRef(0);
   const speakerRef = useRef('MOI');
   speakerRef.current = speaker;
+  const pendingRef = useRef(null); // timer de coalescing (fin de parole prospect)
+
+  const clearPending = () => {
+    if (pendingRef.current) {
+      clearTimeout(pendingRef.current);
+      pendingRef.current = null;
+    }
+  };
 
   const webSpeechSupported = WebSpeechProvider.isSupported;
 
@@ -95,39 +107,59 @@ export default function App() {
   // ----------------------------------------------------------------------------
   //  Réception d'une réplique finale (depuis un provider STT)
   // ----------------------------------------------------------------------------
+  // Déclenche le coach après une courte pause (≈450 ms) = fin de parole du prospect.
+  // Coalesce plusieurs fragments "final" d'une même phrase → un seul appel, ultra-rapide.
+  const triggerSoon = useCallback(() => {
+    clearPending();
+    pendingRef.current = setTimeout(() => {
+      pendingRef.current = null;
+      runCoach();
+    }, 450);
+  }, [runCoach]);
+
   const onFinalTurn = useCallback((text, who, speechFinal = true) => {
     const sp = who || speakerRef.current;
     setInterim(null);
     setTurns((prev) => pushTurn(prev, sp, text));
-    if (sp === 'PROSPECT' && speechFinal) {
-      // le prospect a fini de parler → on souffle la prochaine réplique
-      setTimeout(() => runCoach(), 0);
-    }
-  }, [runCoach]);
+    // Mains-libres : dès que le PROSPECT fait une pause, on souffle la réponse.
+    if (sp === 'PROSPECT' && speechFinal) triggerSoon();
+  }, [triggerSoon]);
+
+  // Push-to-talk : maintiens pour parler (= MOI), relâche → on réécoute le prospect.
+  const talkStart = useCallback(() => {
+    clearPending(); // ma voix ne doit pas déclencher de suggestion
+    setSpeaker('MOI');
+  }, []);
+  const talkEnd = useCallback(() => setSpeaker('PROSPECT'), []);
 
   // ----------------------------------------------------------------------------
   //  Démarrer / arrêter l'écoute live (Web Speech ou Deepgram)
   // ----------------------------------------------------------------------------
   const startLive = useCallback(async () => {
     setError(null);
+    setSpeaker('PROSPECT'); // mains-libres : on écoute le prospect par défaut
     const provider = settings.provider === 'deepgram' ? new DeepgramProvider() : new WebSpeechProvider();
     providerRef.current = provider;
     try {
-      await provider.start({
-        onInterim: (text, who) => setInterim({ speaker: who || speakerRef.current, text }),
-        onFinal: (text, who, speechFinal) => onFinalTurn(text, who, speechFinal),
-        onUtteranceEnd: () => {},
-        onError: (msg) => setError(typeof msg === 'string' ? msg : 'erreur micro'),
-      });
+      await provider.start(
+        {
+          onInterim: (text, who) => setInterim({ speaker: who || speakerRef.current, text }),
+          onFinal: (text, who, speechFinal) => onFinalTurn(text, who, speechFinal),
+          onUtteranceEnd: () => {},
+          onError: (msg) => setError(typeof msg === 'string' ? msg : 'erreur micro'),
+        },
+        { source: settings.captureSource || 'mic' },
+      );
       setRunning(true);
       setStatus('listening');
     } catch (e) {
       setError(e.message || String(e));
       providerRef.current = null;
     }
-  }, [settings.provider, onFinalTurn]);
+  }, [settings.provider, settings.captureSource, onFinalTurn]);
 
   const stopLive = useCallback(() => {
+    clearPending();
     providerRef.current?.stop();
     providerRef.current = null;
     setRunning(false);
@@ -176,6 +208,7 @@ export default function App() {
   }, [scenarioId, runCoach]);
 
   const stopSimulation = useCallback(() => {
+    clearPending();
     simAbortRef.current?.abort();
     coachAbortRef.current?.abort();
     simAbortRef.current = null;
@@ -247,11 +280,13 @@ export default function App() {
 
             {!isSim && running && (
               <button
-                className={`sl-btn sl-btn-speaker speaker-${speaker.toLowerCase()}`}
-                onClick={() => setSpeaker((s) => (s === 'MOI' ? 'PROSPECT' : 'MOI'))}
-                title="Qui parle ? (touche M)"
+                className={`sl-btn sl-btn-talk ${speaker === 'MOI' ? 'talking' : ''}`}
+                onPointerDown={talkStart}
+                onPointerUp={talkEnd}
+                onPointerLeave={talkEnd}
+                title="Maintiens appuyé pendant que TU parles. Relâche → j'écoute le prospect."
               >
-                {speaker === 'MOI' ? '🎤 Moi' : '👤 Le prospect'}
+                {speaker === 'MOI' ? '🎤 Tu parles… relâche quand fini' : '👤 J\'écoute le prospect — maintiens pour parler'}
               </button>
             )}
 
@@ -268,6 +303,13 @@ export default function App() {
               Réinitialiser
             </button>
           </div>
+
+          {!isSim && (
+            <p className="sl-hint-live">
+              🎧 Mains-libres : je transcris le prospect et te souffle la réponse <strong>dès qu'il fait une pause</strong>.
+              Maintiens « parler » quand c'est ton tour.
+            </p>
+          )}
 
           <p className="sl-shortcuts">
             <kbd>Espace</kbd> démarrer/arrêter&nbsp;·&nbsp;<kbd>→</kbd> alternative

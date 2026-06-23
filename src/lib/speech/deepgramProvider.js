@@ -14,8 +14,9 @@ export class DeepgramProvider {
     this.firstSpeaker = null;
   }
 
-  async start(handlers = {}) {
+  async start(handlers = {}, { source = 'mic' } = {}) {
     this.handlers = handlers;
+    this.source = source;
 
     // 1) token éphémère
     const tokRes = await fetch('/api/deepgram-token');
@@ -26,8 +27,20 @@ export class DeepgramProvider {
     const { access_token } = await tokRes.json();
     if (!access_token) throw new Error('Token Deepgram vide.');
 
-    // 2) micro
-    this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // 2) capture audio : micro (haut-parleur) OU audio de l'onglet partagé (le call)
+    if (source === 'tab') {
+      this.stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      const audio = this.stream.getAudioTracks();
+      if (!audio.length) {
+        this.stream.getTracks().forEach((t) => t.stop());
+        throw new Error("Aucune piste audio partagée — relance et coche « Partager l'audio de l'onglet ».");
+      }
+      this.stream.getVideoTracks().forEach((t) => t.stop()); // on ne garde que le son
+      this.captureStream = new MediaStream(audio);
+    } else {
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.captureStream = this.stream;
+    }
 
     // 3) WebSocket Deepgram (token passé via sous-protocole, pas d'en-tête possible côté navigateur)
     const params = new URLSearchParams({
@@ -45,7 +58,7 @@ export class DeepgramProvider {
     this.ws = ws;
 
     ws.onopen = () => {
-      const rec = new MediaRecorder(this.stream, { mimeType: 'audio/webm' });
+      const rec = new MediaRecorder(this.captureStream, { mimeType: 'audio/webm' });
       this.recorder = rec;
       rec.ondataavailable = (e) => {
         if (e.data && e.data.size > 0 && ws.readyState === WebSocket.OPEN) ws.send(e.data);
@@ -98,6 +111,7 @@ export class DeepgramProvider {
     this.ws = null;
     this.recorder = null;
     this.stream = null;
+    this.captureStream = null;
     this.firstSpeaker = null;
   }
 }

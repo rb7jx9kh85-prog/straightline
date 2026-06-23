@@ -1,22 +1,28 @@
 // =============================================================================
 //  /api/coach — le cerveau de SL Copilot (fonction serverless edge)
 //
+//  Fournisseur : OpenAI (Chat Completions API, en streaming).
+//
 //  - Reçoit le transcript roulant (12-20 dernières répliques, JSON, section 5).
-//  - Appelle l'API Messages d'Anthropic EN STREAMING avec le system prompt
-//    de la section 6 (collé mot pour mot dans ./_systemPrompt.js).
-//  - Met en cache le system prompt (prompt caching) → tours suivants plus rapides.
+//  - Appelle l'API OpenAI EN STREAMING avec le system prompt de la section 6
+//    (collé mot pour mot dans ./_systemPrompt.js) comme message "system".
+//  - Force une sortie JSON (response_format: json_object) → toujours parsable.
 //  - Renvoie en streaming le texte (JSON structuré) que le front parse au fil de l'eau.
 //
-//  Sécurité : la clé ANTHROPIC_API_KEY vit UNIQUEMENT ici (variable d'env serveur).
-//             Le navigateur ne parle qu'à ce backend, jamais à Anthropic.
+//  Sécurité : la clé OPENAI_API_KEY vit UNIQUEMENT ici (variable d'env serveur).
+//             Le navigateur ne parle qu'à ce backend, jamais à OpenAI.
+//
+//  Variables d'environnement :
+//    OPENAI_API_KEY   (obligatoire)  — ta clé OpenAI (sk-...)
+//    COACH_MODEL      (optionnel)    — modèle, défaut "gpt-4o-mini" (rapide, < 0,8 s)
+//    OPENAI_BASE_URL  (optionnel)    — endpoint compatible OpenAI, défaut api.openai.com/v1
 // =============================================================================
 
 import { SYSTEM_PROMPT } from './_systemPrompt.js';
 
 export const config = { runtime: 'edge' };
 
-const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
-const DEFAULT_MODEL = 'claude-haiku-4-5'; // rapide (< 0,8 s). Surchargable via COACH_MODEL.
+const DEFAULT_MODEL = 'gpt-4o-mini'; // rapide & économique. Surchargable via COACH_MODEL.
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -29,12 +35,9 @@ export default async function handler(req) {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204 });
   if (req.method !== 'POST') return json({ error: 'Method Not Allowed' }, 405);
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    return json(
-      { error: 'ANTHROPIC_API_KEY non configurée côté serveur.' },
-      500,
-    );
+    return json({ error: 'OPENAI_API_KEY non configurée côté serveur.' }, 500);
   }
 
   let body;
@@ -49,7 +52,9 @@ export default async function handler(req) {
   const now = body?.now || new Date().toISOString();
   // Indice optionnel : "alternative" pour redemander une autre formulation (touche →).
   const hint = typeof body?.hint === 'string' ? body.hint : '';
+
   const model = process.env.COACH_MODEL || DEFAULT_MODEL;
+  const baseURL = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
 
   // ---- Construction du message utilisateur (le transcript roulant) ----------
   const transcript = turns
@@ -69,39 +74,44 @@ export default async function handler(req) {
       `(le vendeur veut une alternative), même phase/objectif. ${hint}`;
   }
 
-  // ---- Appel Anthropic en streaming (SSE) ------------------------------------
+  // ---- Appel OpenAI en streaming (SSE) ---------------------------------------
   const payload = {
     model,
     max_tokens: 512,
+    temperature: 0.6,
     stream: true,
-    system: [
-      {
-        type: 'text',
-        text: SYSTEM_PROMPT,
-        cache_control: { type: 'ephemeral' }, // cache du prompt → latence/coût réduits
-      },
+    response_format: { type: 'json_object' }, // garantit un JSON valide (pas de fences)
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: userContent },
     ],
-    messages: [{ role: 'user', content: userContent }],
   };
 
   let upstream;
   try {
-    upstream = await fetch(ANTHROPIC_URL, {
+    upstream = await fetch(`${baseURL}/chat/completions`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(payload),
     });
   } catch (err) {
-    return json({ error: 'Échec de connexion à Anthropic : ' + String(err?.message || err) }, 502);
+    return json({ error: 'Échec de connexion à OpenAI : ' + String(err?.message || err) }, 502);
   }
 
   if (!upstream.ok || !upstream.body) {
-    const detail = await upstream.text().catch(() => '');
-    return json({ error: `Anthropic a renvoyé ${upstream.status}`, detail }, 502);
+    let detail = '';
+    let message = `OpenAI a renvoyé ${upstream.status}`;
+    try {
+      const errJson = await upstream.json();
+      message = errJson?.error?.message || message;
+      detail = JSON.stringify(errJson);
+    } catch {
+      detail = await upstream.text().catch(() => '');
+    }
+    return json({ error: message, detail }, 502);
   }
 
   // ---- Re-streaming vers le navigateur : on ne renvoie que le TEXTE (le JSON) -
@@ -125,32 +135,28 @@ export default async function handler(req) {
             const trimmed = line.trim();
             if (!trimmed.startsWith('data:')) continue;
             const data = trimmed.slice(5).trim();
-            if (!data || data === '[DONE]') continue;
+            if (!data) continue;
+            if (data === '[DONE]') {
+              controller.close();
+              return;
+            }
             try {
               const evt = JSON.parse(data);
-              if (
-                evt.type === 'content_block_delta' &&
-                evt.delta &&
-                evt.delta.type === 'text_delta' &&
-                typeof evt.delta.text === 'string'
-              ) {
-                controller.enqueue(encoder.encode(evt.delta.text));
-              } else if (evt.type === 'error') {
+              const delta = evt.choices?.[0]?.delta?.content;
+              if (typeof delta === 'string' && delta.length) {
+                controller.enqueue(encoder.encode(delta));
+              } else if (evt.error) {
                 controller.enqueue(
-                  encoder.encode(
-                    JSON.stringify({ error: evt.error?.message || 'erreur Anthropic' }),
-                  ),
+                  encoder.encode(JSON.stringify({ error: evt.error?.message || 'erreur OpenAI' })),
                 );
               }
             } catch {
-              /* ligne SSE non-JSON (ping, etc.) : on ignore */
+              /* ligne SSE non-JSON (commentaire/keep-alive) : on ignore */
             }
           }
         }
       } catch (err) {
-        controller.enqueue(
-          encoder.encode(JSON.stringify({ error: String(err?.message || err) })),
-        );
+        controller.enqueue(encoder.encode(JSON.stringify({ error: String(err?.message || err) })));
       } finally {
         controller.close();
       }
