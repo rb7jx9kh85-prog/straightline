@@ -52,6 +52,7 @@ export default function App() {
   const speakerRef = useRef('MOI');
   speakerRef.current = speaker;
   const pendingRef = useRef(null); // timer de coalescing (fin de parole prospect)
+  const fellBackRef = useRef(false); // évite une boucle de repli Deepgram → micro
 
   const clearPending = () => {
     if (pendingRef.current) {
@@ -139,10 +140,27 @@ export default function App() {
   // ----------------------------------------------------------------------------
   //  Démarrer / arrêter l'écoute live (Web Speech ou Deepgram)
   // ----------------------------------------------------------------------------
-  const startLive = useCallback(async () => {
+  const startLive = useCallback(async (providerId) => {
+    const prov = providerId || settings.provider;
+    if (!providerId) fellBackRef.current = false; // démarrage manuel → on réarme le repli
     setError(null);
     setSpeaker('PROSPECT'); // mains-libres : on écoute le prospect par défaut
-    const provider = settings.provider === 'deepgram' ? new DeepgramProvider() : new WebSpeechProvider();
+
+    // Deepgram en échec → bascule automatique sur le micro du navigateur (gratuit, sans clé)
+    const onLiveError = (msg) => {
+      if (prov === 'deepgram' && WebSpeechProvider.isSupported && !fellBackRef.current) {
+        fellBackRef.current = true;
+        try { providerRef.current?.stop(); } catch { /* */ }
+        providerRef.current = null;
+        setSettings((s) => ({ ...s, provider: 'webspeech' }));
+        setError('Deepgram indisponible — bascule automatique sur le micro du navigateur (gratuit).');
+        startLive('webspeech');
+        return;
+      }
+      setError(typeof msg === 'string' ? msg : 'erreur de transcription');
+    };
+
+    const provider = prov === 'deepgram' ? new DeepgramProvider() : new WebSpeechProvider();
     providerRef.current = provider;
     try {
       await provider.start(
@@ -150,20 +168,21 @@ export default function App() {
           onInterim: (text, who) => setInterim({ speaker: who || speakerRef.current, text }),
           onFinal: (text, who, speechFinal) => onFinalTurn(text, who, speechFinal),
           onUtteranceEnd: () => {},
-          onError: (msg) => setError(typeof msg === 'string' ? msg : 'erreur micro'),
+          onError: onLiveError,
         },
         { source: settings.captureSource || 'mic' },
       );
       setRunning(true);
       setStatus('listening');
     } catch (e) {
-      setError(e.message || String(e));
       providerRef.current = null;
+      onLiveError(e.message || String(e));
     }
   }, [settings.provider, settings.captureSource, onFinalTurn]);
 
   const stopLive = useCallback(() => {
     clearPending();
+    fellBackRef.current = false;
     providerRef.current?.stop();
     providerRef.current = null;
     setRunning(false);
