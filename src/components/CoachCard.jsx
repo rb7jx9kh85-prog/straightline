@@ -49,12 +49,18 @@ export default function CoachCard({ suggestion, streaming, status, error }) {
     s.objection_detectee && s.objection_detectee.toLowerCase() !== 'aucune' ? s.objection_detectee : null;
 
   if (error || s._error) {
+    const msg = error || s._error;
+    const isQuota = /quota|billing|exceeded|insufficient|429/i.test(msg);
     return (
       <section className="sl-card sl-card-error">
         <div className="sl-card-error-inner">
           <span className="sl-err-mark">⚠</span>
-          <p>{error || s._error}</p>
-          <p className="sl-err-hint">Vérifie ta clé API côté serveur, ou lance le mode simulation.</p>
+          <p>{msg}</p>
+          <p className="sl-err-hint">
+            {isQuota
+              ? "Ta clé OpenAI n'a plus de crédit. Ajoute un moyen de paiement sur platform.openai.com → Billing (vérifie que le crédit est sur la bonne organisation). En attendant, la Simulation tourne en mode démo hors-ligne."
+              : 'Vérifie ta clé API côté serveur, ou lance le mode simulation.'}
+          </p>
         </div>
       </section>
     );
@@ -68,6 +74,11 @@ export default function CoachCard({ suggestion, streaming, status, error }) {
         </span>
         {tenLabel && <span className="sl-chip sl-chip-ten">{tenLabel}</span>}
         {objection && <span className="sl-chip sl-chip-obj">objection&nbsp;: {objection}</span>}
+        {s._offline && (
+          <span className="sl-chip sl-chip-offline" title="API indisponible — carte pré-écrite du scénario">
+            démo hors-ligne
+          </span>
+        )}
         <span className="sl-band-spacer" />
         <CertitudeGauge value={s.certitude_estimee} />
       </div>

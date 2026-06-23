@@ -66,7 +66,7 @@ export default function App() {
   // ----------------------------------------------------------------------------
   //  Appel du coach (streaming + parsing partiel + mesure de latence)
   // ----------------------------------------------------------------------------
-  const runCoach = useCallback(async (hint) => {
+  const runCoach = useCallback(async (hint, { fallback } = {}) => {
     coachAbortRef.current?.abort();
     const ac = new AbortController();
     coachAbortRef.current = ac;
@@ -85,16 +85,18 @@ export default function App() {
 
     try {
       let lastRaw = '';
+      let streamErr = null;
       for await (const raw of streamCoach(payload, { signal: ac.signal })) {
         lastRaw = raw;
         const parsed = parsePartial(raw);
+        if (parsed._error) { streamErr = parsed._error; break; } // erreur backend renvoyée en clair
         setSuggestion(parsed);
         if (!gotFirst && parsed.phrase_a_dire) {
           gotFirst = true;
           setLatency((l) => ({ ...l, first: performance.now() - t0 }));
         }
-        if (parsed._error) setError(parsed._error);
       }
+      if (streamErr) throw new Error(streamErr);
       const finalParsed = parsePartial(lastRaw);
       setSuggestion(finalParsed);
       setLatency((l) => ({
@@ -102,7 +104,15 @@ export default function App() {
         full: performance.now() - t0,
       }));
     } catch (e) {
-      if (e.name !== 'AbortError') setError(e.message || String(e));
+      if (e.name === 'AbortError') return;
+      // API indisponible (quota, clé sans crédit, réseau…) : en simulation, on bascule
+      // sur la carte pré-écrite du scénario pour que la démo reste jouable sans clé.
+      if (fallback) {
+        setSuggestion({ ...fallback, _complete: true, _offline: true });
+        setError(null);
+      } else {
+        setError(e.message || String(e));
+      }
     } finally {
       setStreaming(false);
       setStatus((prev) => (prev === 'thinking' ? (running ? 'listening' : 'idle') : prev));
@@ -216,7 +226,7 @@ export default function App() {
         setInterim(null);
         setTurns((prev) => pushTurn(prev, turn.speaker, turn.text));
         if (turn.speaker === 'PROSPECT') {
-          await runCoach();
+          await runCoach(undefined, { fallback: turn.coach });
           await sleep(900, ac.signal); // laisse lire la carte
         }
       }

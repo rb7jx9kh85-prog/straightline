@@ -154,6 +154,7 @@ code { font-size: 0.85em; color: var(--or-pale); }
 .sl-chip-phase { color: #1a1406; background: var(--or); border-color: transparent; }
 .sl-chip-ten { color: var(--ivoire-2); }
 .sl-chip-obj { color: var(--rouge); border-color: rgba(207, 90, 64, 0.4); background: rgba(207, 90, 64, 0.08); text-transform: none; }
+.sl-chip-offline { color: var(--ambre); border-color: rgba(217, 164, 65, 0.4); background: rgba(217, 164, 65, 0.08); }
 
 .sl-cert { display: inline-flex; align-items: center; gap: 7px; }
 .sl-cert-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.7px; color: var(--gris); }

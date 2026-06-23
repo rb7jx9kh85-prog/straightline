@@ -89,7 +89,10 @@ Sources audio (interface `SpeechProvider`, dossier `src/lib/speech/`) :
   - 🖥️ **Audio de l'onglet** : partage l'onglet de ton call web (Google Meet, WhatsApp Web…) en
     cochant « Partager l'audio » → SL Copilot écoute **la vraie voix du prospect**, pas seulement
     le micro. Nécessite `DEEPGRAM_API_KEY` côté serveur.
-- **Simulation** — rejoue des scénarios d'objections. Zéro clé. Idéal pour tester latence + qualité.
+- **Simulation** — rejoue des scénarios d'objections. Idéal pour tester latence + qualité. Si l'API
+  OpenAI ne répond pas (quota dépassé, clé sans crédit, hors-ligne…), l'app bascule automatiquement
+  sur les **cartes de conseil pré-écrites** du scénario (badge « démo hors-ligne ») : la démo reste
+  jouable de bout en bout **sans aucune clé**.
 
 ---
 
