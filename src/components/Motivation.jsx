@@ -2,33 +2,30 @@ import { useEffect, useRef, useState } from 'react';
 import { QUOTES } from '../lib/motivation/quotes.js';
 import { TRACKS } from '../lib/motivation/tracks.js';
 
-// Portrait avec repli stylisé si l'image n'est pas (encore) déposée dans public/img/.
-function Portrait({ src, name, role }) {
-  const [ok, setOk] = useState(true);
-  return (
-    <figure className="sl-portrait">
-      {ok ? (
-        <img src={src} alt={name} loading="lazy" onError={() => setOk(false)} />
-      ) : (
-        <div className="sl-portrait-ph">
-          <span className="sl-portrait-ph-name">{name}</span>
-          <small>dépose <code>{src.replace('/', '')}</code></small>
-        </div>
-      )}
-      <figcaption>
-        <strong>{name}</strong>
-        <span>{role}</span>
-      </figcaption>
-    </figure>
-  );
+const GALLERY = [
+  { src: '/img/dicaprio-fist.jpg', cap: "L'énergie du closer" },
+  { src: '/img/dicaprio-dollar.jpg', cap: 'Vends-moi ce billet' },
+  { src: '/img/wolf-poster.jpg', cap: 'The Wolf of Wall Street' },
+];
+
+const HERO_IMG = '/img/dicaprio-arms.jpg';
+
+function fmt(s) {
+  if (!s || Number.isNaN(s)) return '0:00';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
 export default function Motivation() {
   const audioRef = useRef(null);
-  const [current, setCurrent] = useState(null);
+  const [track] = useState(TRACKS[0] || null);
   const [playing, setPlaying] = useState(false);
-  const [missing, setMissing] = useState({});
+  const [missing, setMissing] = useState(false);
+  const [cur, setCur] = useState(0);
+  const [dur, setDur] = useState(0);
   const [qi, setQi] = useState(0);
+  const [heroOk, setHeroOk] = useState(true);
 
   // Citation mise en avant qui tourne
   useEffect(() => {
@@ -36,74 +33,88 @@ export default function Motivation() {
     return () => clearInterval(id);
   }, []);
 
-  const play = (track) => {
+  // Vérifie discrètement si l'image héros existe (pour le repli stylisé)
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => setHeroOk(true);
+    img.onerror = () => setHeroOk(false);
+    img.src = HERO_IMG;
+  }, []);
+
+  const toggle = () => {
     const a = audioRef.current;
-    if (!a) return;
-    if (current?.id === track.id && playing) {
+    if (!a || !track) return;
+    if (playing) {
       a.pause();
       return;
     }
-    if (current?.id !== track.id) {
-      a.src = track.src;
-      setCurrent(track);
-    }
     a.play()
       .then(() => setPlaying(true))
-      .catch(() => setMissing((m) => ({ ...m, [track.id]: true })));
+      .catch(() => setMissing(true));
   };
+
+  const seek = (e) => {
+    const a = audioRef.current;
+    if (!a || !dur) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    a.currentTime = ((e.clientX - rect.left) / rect.width) * dur;
+  };
+
+  const pct = dur ? (cur / dur) * 100 : 0;
 
   return (
     <section className="sl-motivation">
-      {/* Héros : citation + portraits */}
-      <div className="sl-moti-hero">
-        <div className="sl-moti-hero-text">
-          <p className="sl-moti-kicker">Avant de décrocher</p>
-          <h2 className="sl-moti-quote">« {QUOTES[qi].text} »</h2>
-          <p className="sl-moti-author">— {QUOTES[qi].author}</p>
-        </div>
-        <div className="sl-portraits">
-          <Portrait src="/img/belfort.jpg" name="Jordan Belfort" role="Le vrai loup" />
-          <Portrait src="/img/dicaprio.jpg" name="Leonardo DiCaprio" role="Le loup à l'écran" />
-        </div>
+      {/* Héros cinématique */}
+      <div
+        className={`sl-moti-hero ${heroOk ? 'has-img' : ''}`}
+        style={heroOk ? { backgroundImage: `linear-gradient(180deg, rgba(10,10,11,0.25), rgba(10,10,11,0.92)), url(${HERO_IMG})` } : undefined}
+      >
+        <p className="sl-moti-kicker">Avant de décrocher</p>
+        <h2 className="sl-moti-quote">« {QUOTES[qi].text} »</h2>
+        <p className="sl-moti-author">— {QUOTES[qi].author}</p>
       </div>
 
-      {/* Lecteur MP3 */}
-      <div className="sl-moti-audio">
-        <h3 className="sl-moti-h3">Passages cultes — Le Loup de Wall Street</h3>
-        <audio
-          ref={audioRef}
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
-          onEnded={() => setPlaying(false)}
-          onError={() => current && setMissing((m) => ({ ...m, [current.id]: true }))}
-        />
-        <div className="sl-tracks">
-          {TRACKS.map((t) => {
-            const isCur = current?.id === t.id;
-            const miss = missing[t.id];
-            return (
-              <button
-                key={t.id}
-                className={`sl-track ${isCur && playing ? 'playing' : ''} ${miss ? 'missing' : ''}`}
-                onClick={() => play(t)}
-              >
-                <span className="sl-track-play" aria-hidden="true">{isCur && playing ? '❚❚' : '▶'}</span>
-                <span className="sl-track-text">
-                  <strong>{t.title}</strong>
-                  <small>
-                    {miss
-                      ? `fichier manquant — dépose ${t.src.replace('/audio/', '')} dans public/audio/`
-                      : t.subtitle}
-                  </small>
-                </span>
-              </button>
-            );
-          })}
+      {/* Lecteur du discours */}
+      {track && (
+        <div className="sl-moti-audio">
+          <h3 className="sl-moti-h3">Le discours qui met dans le bain</h3>
+          <audio
+            ref={audioRef}
+            src={track.src}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={() => setPlaying(false)}
+            onError={() => setMissing(true)}
+            onTimeUpdate={(e) => setCur(e.currentTarget.currentTime)}
+            onLoadedMetadata={(e) => setDur(e.currentTarget.duration)}
+          />
+          <div className={`sl-player ${playing ? 'playing' : ''} ${missing ? 'missing' : ''}`}>
+            <button className="sl-player-btn" onClick={toggle} aria-label={playing ? 'Pause' : 'Lecture'}>
+              {playing ? '❚❚' : '▶'}
+            </button>
+            <div className="sl-player-body">
+              <strong>{track.title}</strong>
+              <small>{missing ? `fichier manquant — dépose ${track.src.replace('/audio/', '')} dans public/audio/` : track.subtitle}</small>
+              <div className="sl-player-bar" onClick={seek}>
+                <span className="sl-player-fill" style={{ width: `${pct}%` }} />
+              </div>
+              <div className="sl-player-time">
+                <span>{fmt(cur)}</span>
+                <span>{fmt(dur)}</span>
+              </div>
+            </div>
+          </div>
         </div>
-        <p className="sl-moti-note">
-          Dépose tes fichiers MP3 dans <code>public/audio/</code> (voir le README du dossier).
-          Usage personnel — n'héberge pas d'extraits protégés sur une URL publique.
-        </p>
+      )}
+
+      {/* Galerie */}
+      <div className="sl-gallery">
+        {GALLERY.map((g, i) => (
+          <figure key={i} className="sl-shot">
+            <img src={g.src} alt={g.cap} loading="lazy" onError={(e) => { e.currentTarget.parentElement.style.display = 'none'; }} />
+            <figcaption>{g.cap}</figcaption>
+          </figure>
+        ))}
       </div>
 
       {/* Mur de citations */}
@@ -115,6 +126,11 @@ export default function Motivation() {
           </blockquote>
         ))}
       </div>
+
+      <p className="sl-moti-note">
+        Visuels &amp; audio : Le Loup de Wall Street (© Paramount). Usage personnel — pense aux droits
+        d'auteur si tu rends l'app publique.
+      </p>
     </section>
   );
 }
