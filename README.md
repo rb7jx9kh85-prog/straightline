@@ -93,6 +93,19 @@ Sources audio (interface `SpeechProvider`, dossier `src/lib/speech/`) :
 
 ---
 
+## 🔥 Onglet Motivation
+
+Un second onglet « Motivation » (esprit *Wolf of Wall Street*) avec citations, portraits et un
+lecteur MP3. Tu y déposes **tes propres fichiers** :
+
+- **Sons** → `public/audio/` : `motivation-1.mp3` … `motivation-4.mp3` (titres modifiables dans
+  `src/lib/motivation/tracks.js`).
+- **Images** → `public/img/` : `belfort.jpg`, `dicaprio.jpg` (sinon un cadre stylisé s'affiche).
+
+> ⚠️ **Droits** : les extraits du film et les photos de personnes réelles sont protégés. Utilise des
+> fichiers dont tu as les droits / en usage personnel ; n'héberge pas d'extraits piratés sur l'URL
+> publique. Voir les README dans `public/audio/` et `public/img/`.
+
 ## 🤖 Modèle LLM
 
 Fournisseur : **OpenAI** (Chat Completions, en streaming, sortie JSON forcée).

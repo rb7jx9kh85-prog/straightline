@@ -4,6 +4,7 @@ import CoachCard from './components/CoachCard.jsx';
 import TranscriptFeed from './components/TranscriptFeed.jsx';
 import StatusBar from './components/StatusBar.jsx';
 import SettingsPanel from './components/SettingsPanel.jsx';
+import Motivation from './components/Motivation.jsx';
 import { streamCoach } from './lib/coachClient.js';
 import { parsePartial } from './lib/partialJson.js';
 import { pushTurn, buildPayload } from './lib/transcript.js';
@@ -40,6 +41,7 @@ export default function App() {
   const [latency, setLatency] = useState({ first: null, full: null });
   const [scenarioId, setScenarioId] = useState(SCENARIOS[0].id);
   const [running, setRunning] = useState(false); // écoute live OU simulation en cours
+  const [tab, setTab] = useState('copilote'); // 'copilote' | 'motivation'
 
   const turnsRef = useRef(turns);
   turnsRef.current = turns;
@@ -267,69 +269,87 @@ export default function App() {
     <div className="sl-app">
       <Header />
 
-      <StatusBar status={status} latency={latency} />
+      <nav className="sl-tabs">
+        <button className={`sl-tab ${tab === 'copilote' ? 'active' : ''}`} onClick={() => setTab('copilote')}>
+          🎯 Copilote
+        </button>
+        <button className={`sl-tab ${tab === 'motivation' ? 'active' : ''}`} onClick={() => setTab('motivation')}>
+          🔥 Motivation
+        </button>
+      </nav>
 
-      <main className="sl-main">
-        <div className="sl-left">
-          <CoachCard suggestion={suggestion} streaming={streaming} status={status} error={error} />
+      {tab === 'copilote' ? (
+        <>
+          <StatusBar status={status} latency={latency} />
 
-          <div className="sl-controls">
-            <button className={`sl-btn sl-btn-primary ${running ? 'running' : ''}`} onClick={onPrimary}>
-              {isSim
-                ? running ? '■ Arrêter la simulation' : '▶ Lancer la simulation'
-                : running ? '■ Arrêter l\'écoute' : '● Démarrer l\'écoute'}
-            </button>
+          <main className="sl-main">
+            <div className="sl-left">
+              <CoachCard suggestion={suggestion} streaming={streaming} status={status} error={error} />
 
-            {!isSim && running && (
-              <button
-                className={`sl-btn sl-btn-talk ${speaker === 'MOI' ? 'talking' : ''}`}
-                onPointerDown={talkStart}
-                onPointerUp={talkEnd}
-                onPointerLeave={talkEnd}
-                title="Maintiens appuyé pendant que TU parles. Relâche → j'écoute le prospect."
-              >
-                {speaker === 'MOI' ? '🎤 Tu parles… relâche quand fini' : '👤 J\'écoute le prospect — maintiens pour parler'}
-              </button>
-            )}
+              {/* GROS bouton PARLER, explicite, pendant un appel live */}
+              {!isSim && running && (
+                <button
+                  className={`sl-ptt ${speaker === 'MOI' ? 'on' : ''}`}
+                  onPointerDown={talkStart}
+                  onPointerUp={talkEnd}
+                  onPointerLeave={talkEnd}
+                  onContextMenu={(e) => e.preventDefault()}
+                >
+                  <span className="sl-ptt-icon" aria-hidden="true">{speaker === 'MOI' ? '🔴' : '🎙️'}</span>
+                  <span className="sl-ptt-main">{speaker === 'MOI' ? 'TU PARLES…' : 'MAINTENIR POUR PARLER'}</span>
+                  <span className="sl-ptt-sub">
+                    {speaker === 'MOI' ? 'relâche dès que tu as fini' : "garde le doigt appuyé quand c'est à toi de parler"}
+                  </span>
+                </button>
+              )}
 
-            <button
-              className="sl-btn sl-btn-ghost"
-              onClick={() => turns.length && runCoach('Donne une formulation nettement différente.')}
-              disabled={!turns.length || streaming}
-              title="Donne-moi une alternative (touche →)"
-            >
-              ↻ Alternative
-            </button>
+              <div className="sl-controls">
+                <button className={`sl-btn sl-btn-primary ${running ? 'running' : ''}`} onClick={onPrimary}>
+                  {isSim
+                    ? running ? '■ Arrêter la simulation' : '▶ Lancer la simulation'
+                    : running ? '■ Arrêter l\'écoute' : '● Démarrer l\'écoute'}
+                </button>
+                <button
+                  className="sl-btn sl-btn-ghost"
+                  onClick={() => turns.length && runCoach('Donne une formulation nettement différente.')}
+                  disabled={!turns.length || streaming}
+                  title="Donne-moi une alternative (touche →)"
+                >
+                  ↻ Alternative
+                </button>
+                <button className="sl-btn sl-btn-ghost" onClick={resetAll} title="Repartir de zéro">
+                  Réinitialiser
+                </button>
+              </div>
 
-            <button className="sl-btn sl-btn-ghost" onClick={resetAll} title="Repartir de zéro">
-              Réinitialiser
-            </button>
-          </div>
+              {!isSim && (
+                <p className="sl-hint-live">
+                  🎧 Mains-libres : je transcris le prospect et te souffle la réponse <strong>dès qu'il fait une pause</strong>.
+                  Quand c'est ton tour, <strong>maintiens le bouton « PARLER »</strong> (ta voix n'est pas prise pour une objection).
+                </p>
+              )}
 
-          {!isSim && (
-            <p className="sl-hint-live">
-              🎧 Mains-libres : je transcris le prospect et te souffle la réponse <strong>dès qu'il fait une pause</strong>.
-              Maintiens « parler » quand c'est ton tour.
-            </p>
-          )}
+              <p className="sl-shortcuts">
+                <kbd>Espace</kbd> démarrer/arrêter&nbsp;·&nbsp;<kbd>→</kbd> alternative
+                {!isSim && <>&nbsp;·&nbsp;<kbd>M</kbd> locuteur</>}
+              </p>
+            </div>
 
-          <p className="sl-shortcuts">
-            <kbd>Espace</kbd> démarrer/arrêter&nbsp;·&nbsp;<kbd>→</kbd> alternative
-            {!isSim && <>&nbsp;·&nbsp;<kbd>M</kbd> changer de locuteur</>}
-          </p>
-        </div>
-
-        <div className="sl-right">
-          <SettingsPanel
-            settings={settings}
-            onChange={(s) => { if (!running) setSettings(s); }}
-            scenarioId={scenarioId}
-            onScenario={setScenarioId}
-            webSpeechSupported={webSpeechSupported}
-          />
-          <TranscriptFeed turns={turns} interim={interim} />
-        </div>
-      </main>
+            <div className="sl-right">
+              <SettingsPanel
+                settings={settings}
+                onChange={(s) => { if (!running) setSettings(s); }}
+                scenarioId={scenarioId}
+                onScenario={setScenarioId}
+                webSpeechSupported={webSpeechSupported}
+              />
+              <TranscriptFeed turns={turns} interim={interim} />
+            </div>
+          </main>
+        </>
+      ) : (
+        <Motivation />
+      )}
 
       <footer className="sl-footer">
         Clés API côté serveur uniquement&nbsp;·&nbsp;transcription éphémère&nbsp;·&nbsp;
