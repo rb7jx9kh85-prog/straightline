@@ -1,66 +1,40 @@
-# Déploiement — GitHub Actions → Vercel
+# Déploiement — Vercel (intégration native GitHub)
 
-Le workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) build et déploie
-**automatiquement** SL Copilot (interface + backend OpenAI `/api`) sur Vercel à chaque `push`.
+La façon la plus simple : on **importe le repo dans Vercel une fois**, et ensuite **chaque push se
+déploie automatiquement**. Pas de YAML, pas de secret à gérer dans GitHub. La clé `OPENAI_API_KEY`
+vit côté Vercel (serveur), jamais dans le front.
 
-> Pourquoi Vercel et pas GitHub Pages ? Le backend `/api/coach` est une fonction **serverless**
-> qui détient la clé `OPENAI_API_KEY`. GitHub Pages ne sert que du statique : l'IA n'y tournerait
-> pas et la clé n'aurait nulle part où vivre. GitHub Actions construit, Vercel héberge.
+> Pourquoi pas GitHub Pages ? Le backend `/api/coach` est une fonction **serverless** qui détient la
+> clé OpenAI. Pages ne sert que du statique : l'IA n'y tournerait pas. Vercel exécute les `/api`.
 
-## Configuration (une seule fois, ~5 min)
+## Étapes (~3 min, une seule fois)
 
-### 1. Créer le projet Vercel et récupérer les 3 identifiants
+1. Va sur **[vercel.com/new](https://vercel.com/new)** → **Import Git Repository**.
+2. Connecte ton compte GitHub si besoin, puis sélectionne le repo **`straightline`**.
+3. Vercel détecte **Vite** automatiquement (build `vite build`, sortie `dist`, déjà fixé dans
+   `vercel.json`). Rien à changer.
+4. Déplie **Environment Variables** et ajoute :
 
-En local, à la racine du repo :
+   | Variable | Obligatoire | Valeur |
+   |---|---|---|
+   | `OPENAI_API_KEY` | ✅ | `sk-...` |
+   | `COACH_MODEL` | — | `gpt-4o-mini` (défaut) ou `gpt-4o` |
+   | `OPENAI_BASE_URL` | — | endpoint compatible OpenAI (Azure/proxy) |
+   | `DEEPGRAM_API_KEY` | — | STT Deepgram (diarization / audio onglet) |
 
-```bash
-npm i -g vercel
-vercel login
-vercel link          # crée/associe le projet → écrit .vercel/project.json
-```
+5. Clique **Deploy**. Vercel build et te donne l'URL live.
 
-Dans `.vercel/project.json` tu trouves :
-- `orgId`     → **VERCEL_ORG_ID**
-- `projectId` → **VERCEL_PROJECT_ID**
+## Ensuite : tout est automatique
 
-Et le **VERCEL_TOKEN** : Vercel → *Account Settings → Tokens → Create Token*.
+- **Push sur la branche de production** (par défaut `main`) → déploiement **production**.
+- **Push sur une autre branche / PR** → **URL de preview** dédiée (le `/api` fonctionne aussi).
 
-### 2. Ajouter les 3 secrets dans GitHub
+Comme on travaille sur la branche `claude/awesome-bardeen-wxd7ke`, deux options :
+- utiliser directement l'**URL de preview** de cette branche (pleinement fonctionnelle), ou
+- dans Vercel → *Project → Settings → Git*, mettre cette branche comme **Production Branch**, ou
+  fusionner le travail dans `main`.
 
-Repo GitHub → **Settings → Secrets and variables → Actions → New repository secret** :
+## Mettre à jour une variable d'env
 
-| Secret | Valeur |
-|---|---|
-| `VERCEL_TOKEN` | le token créé ci-dessus |
-| `VERCEL_ORG_ID` | `orgId` |
-| `VERCEL_PROJECT_ID` | `projectId` |
-
-### 3. Mettre la clé OpenAI dans Vercel (PAS dans GitHub)
-
-Vercel → ton projet → **Settings → Environment Variables** (environnement **Production**) :
-
-| Variable | Obligatoire | Valeur |
-|---|---|---|
-| `OPENAI_API_KEY` | ✅ | `sk-...` |
-| `COACH_MODEL` | — | `gpt-4o-mini` (défaut) ou `gpt-4o` |
-| `OPENAI_BASE_URL` | — | endpoint compatible OpenAI (Azure/proxy) |
-| `DEEPGRAM_API_KEY` | — | pour le STT Deepgram (diarization / audio onglet) |
-
-> La clé vit **uniquement** côté Vercel (serveur). Elle n'est jamais dans le bundle front ni dans GitHub.
-
-### 4. Déployer
-
-Pousse un commit (ou lance le workflow manuellement : onglet **Actions → Déploiement Vercel → Run workflow**).
-L'URL de production s'affiche à la fin du job (section *Summary*).
-
-## Restreindre à la branche principale (optionnel)
-
-Le workflow déploie en production sur `main` **et** sur les branches `claude/**` (pratique pour voir
-le travail en cours en live). Pour ne déployer que `main`, édite le bloc `on.push.branches` du workflow :
-
-```yaml
-on:
-  push:
-    branches: [main]
-  workflow_dispatch: {}
-```
+Vercel → ton projet → **Settings → Environment Variables** → modifie, puis **Redeploy**
+(*Deployments → … → Redeploy*).

@@ -110,16 +110,16 @@ rendez-vous important, mets `COACH_MODEL=gpt-4o` côté serveur. Endpoint compat
 
 ---
 
-## ☁️ Déploiement (GitHub Actions → Vercel)
+## ☁️ Déploiement (Vercel, intégration native GitHub)
 
-Déploiement **automatique à chaque push** via [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
-Procédure complète (3 secrets GitHub + la clé OpenAI dans Vercel) : voir **[DEPLOY.md](DEPLOY.md)**.
+Le plus simple — guide complet dans **[DEPLOY.md](DEPLOY.md)** :
 
-En résumé :
-1. `vercel link` → récupère `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID`, crée un `VERCEL_TOKEN`.
-2. Ajoute ces 3 valeurs dans *GitHub → Settings → Secrets → Actions*.
-3. Mets `OPENAI_API_KEY` (et options) dans *Vercel → Settings → Environment Variables*.
-4. Push → l'Action build (`vite build` + fonctions `/api`) et déploie. URL en fin de job.
+1. **[vercel.com/new](https://vercel.com/new)** → *Import Git Repository* → sélectionne `straightline`.
+2. Vercel détecte Vite tout seul (build `vite build` → `dist`, fixé dans `vercel.json`).
+3. Ajoute `OPENAI_API_KEY` (+ options) dans *Environment Variables*, puis **Deploy**.
+4. Ensuite **chaque push se déploie automatiquement** ; chaque branche/PR a une **URL de preview**.
+
+Zéro YAML, zéro secret dans GitHub — la clé OpenAI vit côté Vercel.
 
 > GitHub Pages ne convient pas : il ne sert que du statique et n'exécute pas le backend `/api`.
 
