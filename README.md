@@ -110,12 +110,18 @@ rendez-vous important, mets `COACH_MODEL=gpt-4o` côté serveur. Endpoint compat
 
 ---
 
-## ☁️ Déploiement (Vercel)
+## ☁️ Déploiement (GitHub Actions → Vercel)
 
-1. Importer le repo sur Vercel.
-2. Variables d'environnement : `OPENAI_API_KEY` (obligatoire), `COACH_MODEL` (optionnel),
-   `OPENAI_BASE_URL` (optionnel), `DEEPGRAM_API_KEY` (optionnel).
-3. Build auto (`vite build` → `dist`), fonctions `/api` en edge runtime. Aussi compatible Netlify.
+Déploiement **automatique à chaque push** via [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
+Procédure complète (3 secrets GitHub + la clé OpenAI dans Vercel) : voir **[DEPLOY.md](DEPLOY.md)**.
+
+En résumé :
+1. `vercel link` → récupère `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID`, crée un `VERCEL_TOKEN`.
+2. Ajoute ces 3 valeurs dans *GitHub → Settings → Secrets → Actions*.
+3. Mets `OPENAI_API_KEY` (et options) dans *Vercel → Settings → Environment Variables*.
+4. Push → l'Action build (`vite build` + fonctions `/api`) et déploie. URL en fin de job.
+
+> GitHub Pages ne convient pas : il ne sert que du statique et n'exécute pas le backend `/api`.
 
 ---
 

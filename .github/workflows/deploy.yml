@@ -1,0 +1,61 @@
+name: Déploiement Vercel
+
+# Build + déploiement de SL Copilot (front Vite + fonctions serverless /api)
+# sur Vercel, à chaque push. Le backend OpenAI tourne réellement (contrairement
+# à GitHub Pages, qui n'exécute pas de serverless).
+#
+# Pré-requis (une seule fois) — voir DEPLOY.md :
+#   Secrets GitHub (Settings → Secrets and variables → Actions) :
+#     - VERCEL_TOKEN
+#     - VERCEL_ORG_ID
+#     - VERCEL_PROJECT_ID
+#   Variables d'env DANS LE PROJET VERCEL (Production) :
+#     - OPENAI_API_KEY   (obligatoire)
+#     - COACH_MODEL, OPENAI_BASE_URL, DEEPGRAM_API_KEY (optionnels)
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  workflow_dispatch: {}
+
+concurrency:
+  group: vercel-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Vérifier les secrets Vercel
+        run: |
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ] || [ -z "${{ secrets.VERCEL_ORG_ID }}" ] || [ -z "${{ secrets.VERCEL_PROJECT_ID }}" ]; then
+            echo "::error::Secrets Vercel manquants. Ajoute VERCEL_TOKEN, VERCEL_ORG_ID et VERCEL_PROJECT_ID dans Settings → Secrets and variables → Actions (voir DEPLOY.md)."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Installer Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Récupérer la config + variables d'env du projet Vercel
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build (front + fonctions /api)
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Déployer en production
+        run: |
+          URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "Déployé : $URL"
+          echo "### ✅ Déployé sur $URL" >> "$GITHUB_STEP_SUMMARY"
