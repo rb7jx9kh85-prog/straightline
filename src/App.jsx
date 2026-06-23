@@ -23,11 +23,13 @@ const sleep = (ms, signal) =>
   });
 
 export default function App() {
-  const [settings, setSettings] = useState({
-    provider: 'simulation',
+  const [settings, setSettings] = useState(() => ({
+    // Par défaut : écoute micro → transcription navigateur (gratuite) → texte envoyé à l'API.
+    // Repli sur la simulation si le navigateur ne supporte pas Web Speech (ex. hors Chrome).
+    provider: WebSpeechProvider.isSupported ? 'webspeech' : 'simulation',
     businessType: 'restaurant',
     captureSource: 'mic', // 'mic' (haut-parleur) | 'tab' (audio de l'onglet, Deepgram)
-  });
+  }));
   const [status, setStatus] = useState('idle'); // idle | listening | speaking | thinking
   const [turns, setTurns] = useState([]);
   const [interim, setInterim] = useState(null); // { speaker, text }
