@@ -109,7 +109,7 @@ export default function App() {
                 onScenario={c.setScenarioId}
                 running={c.running}
               />
-              <NotesPanel onCoach={c.coachFromNotes} streaming={c.streaming} />
+              <NotesPanel onCoach={c.coachFromNotes} streaming={c.streaming} micBusy={!isSim && c.running} />
               <TranscriptFeed turns={c.turns} interim={c.interim} />
             </div>
           </main>
