@@ -87,12 +87,12 @@ export default async function handler(req) {
       headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model,
-        max_tokens: 512,
-        temperature: 0.6,
+        max_tokens: 300,
+        temperature: 0.55,
         stream: true,
         response_format: { type: 'json_object' },
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
           { role: 'user', content: userContent },
         ],
       }),
