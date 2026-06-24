@@ -330,7 +330,6 @@ code { font-size: 0.85em; color: var(--or-pale); }
 }
 .sl-notes-area::placeholder { color: var(--gris-fonce); }
 .sl-notes-area:focus { border-color: var(--ligne-or); }
-.sl-notes-area[readonly] { border-color: rgba(207, 90, 64, 0.4); background: rgba(207, 90, 64, 0.04); }
 .sl-notes-err { margin: -2px 0 0; font-size: 0.74rem; color: var(--ambre); line-height: 1.4; }
 
 .sl-notes-actions { display: flex; gap: 8px; flex-wrap: wrap; }

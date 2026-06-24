@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { createMic, micSupported } from '../lib/micSpeech.js';
 
-// Concatène proprement deux bouts de texte (gère les espaces).
 const append = (base, add) => {
   const b = (base || '').trimEnd();
   const a = (add || '').trim();
@@ -25,7 +24,7 @@ export default function NotesPanel({ onCoach, streaming, micBusy }) {
     micRef.current?.stop();
     micRef.current = null;
     const it = interimRef.current;
-    if (it) setNotes((prev) => append(prev, it)); // ne perd pas la phrase en cours
+    if (it) setNotes((prev) => append(prev, it));
     setInterimSync('');
     setDictating(false);
   };
@@ -50,41 +49,44 @@ export default function NotesPanel({ onCoach, streaming, micBusy }) {
 
   const toggleDictation = () => (dictating ? stopDictation() : startDictation());
 
-  // Texte complet à envoyer (notes validées + phrase en cours de dictée).
   const fullText = () => append(notes, interimRef.current);
 
   const submit = () => {
     const text = fullText();
     if (!text || streaming) return;
-    if (dictating) stopDictation(); // un seul geste : arrête la dictée ET demande le conseil
+    if (dictating) stopDictation();
     onCoach(text);
   };
 
-  const clear = () => { if (dictating) stopDictation(); setNotes(''); setInterimSync(''); setErr(''); };
+  const clear = () => {
+    if (dictating) stopDictation();
+    setNotes('');
+    setInterimSync('');
+    setErr('');
+  };
 
   const display = interim ? append(notes, interim) : notes;
   const hasText = !!fullText();
+
+  const placeholder = micSupported
+    ? "Dicte ou tape ce que le prospect a dit : objections, contexte, secteur…"
+    : "Tape ce que le prospect a dit : objections, contexte, secteur…";
 
   return (
     <div className="sl-notes">
       <div className="sl-notes-head">
         <span className="sl-notes-icon">📝</span>
         <span className="sl-notes-title">Notes prospect</span>
-        {(notes || interim) && !dictating && (
+        {(notes || interim) && (
           <button className="sl-notes-clear" onClick={clear} title="Effacer">✕</button>
         )}
       </div>
 
       <textarea
         className="sl-notes-area"
-        placeholder={
-          micSupported
-            ? 'Touche « Dicter » et parle — ça s’écrit tout seul. (Tu peux aussi écrire.)'
-            : 'Écris ce que le prospect a dit : objections, contexte, secteur…'
-        }
+        placeholder={placeholder}
         value={display}
-        onChange={(e) => { if (!dictating) setNotes(e.target.value); }}
-        readOnly={dictating}
+        onChange={(e) => setNotes(e.target.value)}
         rows={4}
       />
 
@@ -93,12 +95,12 @@ export default function NotesPanel({ onCoach, streaming, micBusy }) {
       <div className="sl-notes-actions">
         {micSupported && (
           <button
-            className={`sl-btn sl-notes-mic ${dictating ? 'on' : ''}`}
+            className={`sl-btn sl-notes-mic${dictating ? ' on' : ''}`}
             onClick={toggleDictation}
             disabled={micBusy}
-            title={micBusy ? "Arrête l'écoute live pour dicter tes notes" : 'Dicter tes notes à la voix'}
+            title={micBusy ? "Stop l'écoute live pour dicter" : 'Dicter tes notes'}
           >
-            {dictating ? '● J’écoute… (toucher pour arrêter)' : '🎤 Dicter'}
+            {dictating ? '● Dictée en cours…' : '🎤 Dicter'}
           </button>
         )}
         <button
@@ -106,7 +108,7 @@ export default function NotesPanel({ onCoach, streaming, micBusy }) {
           onClick={submit}
           disabled={!hasText || streaming}
         >
-          {streaming ? '⏳ Analyse…' : '→ Obtenir le conseil'}
+          {streaming ? '⏳ Analyse…' : '→ Obtenir conseil'}
         </button>
       </div>
     </div>
