@@ -32,11 +32,13 @@ la déflexion puis les loops s'enchaîner.
 
 ## 🔐 Sécurité (non négociable)
 
-- **Aucune clé API dans le front.** `OPENAI_API_KEY` et `DEEPGRAM_API_KEY` vivent uniquement
-  dans les variables d'environnement serveur (fonctions `/api`).
-- Le navigateur ne parle qu'à **mon** backend. Pour Deepgram, le backend émet un **token éphémère**
-  (30 s) ; la clé permanente ne quitte jamais le serveur.
-- Aucun enregistrement audio stocké : transcription éphémère.
+- **Aucune clé API dans le front.** `OPENAI_API_KEY` vit uniquement dans les variables
+  d'environnement serveur (fonction `/api/coach`). Le navigateur ne parle qu'à **mon** backend.
+- **Aucun enregistrement audio stocké : transcription éphémère.** L'app écoute, transcrit en direct
+  pour souffler la réponse, et ne garde **aucun fichier audio**.
+- ⚖️ **Note légale (Suisse, art. 179bis CP)** : *enregistrer* un appel privé sans l'accord des deux
+  parties est illégal. C'est exactement pourquoi l'app reste en **écoute + souffle live, zéro
+  enregistrement** — discret côté prospect (rien à installer chez lui) et safe pour toi.
 
 ---
 
@@ -54,8 +56,8 @@ caching) pour réduire la latence des tours suivants.
 
 ```
 Navigateur (React/Vite)
-  │  micro → STT streaming (Web Speech / Deepgram) → transcript roulant [MOI]/[PROSPECT]
-  │  au silence du prospect (VAD / fin d'énoncé) ──▶ POST /api/coach
+  │  micro (haut-parleur) → Web Speech (STT navigateur, FR, éphémère) → transcript [MOI]/[PROSPECT]
+  │  pause du prospect (~420 ms) ──▶ POST /api/coach
   ▼
 /api/coach  (edge serverless — détient la clé)
   │  system prompt (section 6) + 12-20 dernières répliques → OpenAI Chat Completions (stream)
@@ -79,16 +81,11 @@ automatiquement le coach : la phrase à dire s'écrit en direct. **Mains-libres*
 pendant que le prospect parle. Quand c'est ton tour, **maintiens le bouton « parler »** (ta voix
 est alors étiquetée `MOI` et ne déclenche pas de suggestion).
 
-Sources audio (interface `SpeechProvider`, dossier `src/lib/speech/`) :
+Deux modes seulement (base volontairement simple, `src/lib/`) :
 
-- **Live · micro** — micro du navigateur (Chrome), français, **zéro clé**. Mets le call sur
-  **haut-parleur** : le micro capte les deux voix. Le plus simple pour démarrer tout de suite.
-- **Live · Deepgram** — streaming WebSocket, français, **diarization** (sépare les locuteurs).
-  Deux captations possibles :
-  - 🎤 **Micro** (haut-parleur), ou
-  - 🖥️ **Audio de l'onglet** : partage l'onglet de ton call web (Google Meet, WhatsApp Web…) en
-    cochant « Partager l'audio » → SL Copilot écoute **la vraie voix du prospect**, pas seulement
-    le micro. Nécessite `DEEPGRAM_API_KEY` côté serveur.
+- **Live · micro** — reconnaissance vocale du navigateur (Chrome/Edge), français, **zéro clé**,
+  éphémère. Mets le call sur **haut-parleur** : le micro capte les deux voix. Tu maintiens le bouton
+  **« PARLER »** quand c'est ton tour (ta voix est étiquetée `MOI` et ne déclenche pas de réponse).
 - **Simulation** — rejoue des scénarios d'objections. Idéal pour tester latence + qualité. Si l'API
   OpenAI ne répond pas (quota dépassé, clé sans crédit, hors-ligne…), l'app bascule automatiquement
   sur les **cartes de conseil pré-écrites** du scénario (badge « démo hors-ligne ») : la démo reste
@@ -146,18 +143,18 @@ Zéro YAML, zéro secret dans GitHub — la clé OpenAI vit côté Vercel.
 ```
 api/
   _systemPrompt.js     ← méthode Straight Line, MOT POUR MOT (system prompt)
-  coach.js             ← /api/coach : LLM en streaming (clé serveur)
-  deepgram-token.js    ← /api/deepgram-token : token éphémère
+  coach.js             ← /api/coach : LLM OpenAI en streaming (clé serveur)
+  health.js            ← /api/health : vérifie que la clé est bien configurée
 src/
-  components/          ← Header, CoachCard (la carte), TranscriptFeed, StatusBar, SettingsPanel
+  components/          ← Header, CoachCard (la carte), TranscriptFeed, StatusBar, Settings, Motivation
   lib/
+    useLiveCoach.js    ← cœur : état + orchestration (micro, déclenchement, streaming, simulation)
+    micSpeech.js       ← reconnaissance vocale du navigateur (Web Speech, FR, éphémère)
     coachClient.js     ← lecture du stream /api/coach
     partialJson.js     ← parsing JSON partiel (phrase affichée dès les 1ers tokens)
     transcript.js      ← buffer roulant 20 répliques
-    vad.js             ← détection de fin de parole
-    speech/            ← WebSpeechProvider, DeepgramProvider (interface commune)
-    simulation/        ← scénarios d'objections classiques
-  App.jsx              ← orchestration (écoute, déclenchement, streaming, simulation)
+    simulation/        ← scénarios d'objections + cartes de conseil de repli (hors-ligne)
+  App.jsx              ← vue (branche le hook useLiveCoach sur l'UI)
   styles.css           ← DA Jordan Belfort
 ```
 

@@ -17,12 +17,17 @@ vit côté Vercel (serveur), jamais dans le front.
 
    | Variable | Obligatoire | Valeur |
    |---|---|---|
-   | `OPENAI_API_KEY` | ✅ | `sk-...` |
+   | `OPENAI_API_KEY` | ✅ | `sk-...` (organisation **avec du crédit**) |
    | `COACH_MODEL` | — | `gpt-4o-mini` (défaut) ou `gpt-4o` |
    | `OPENAI_BASE_URL` | — | endpoint compatible OpenAI (Azure/proxy) |
-   | `DEEPGRAM_API_KEY` | — | STT Deepgram (diarization / audio onglet) |
 
 5. Clique **Deploy**. Vercel build et te donne l'URL live.
+
+6. **Vérifie la config** : ouvre `https://<ton-app>.vercel.app/api/health`.
+   - `"openai_key": "configurée"` → la clé est bien lue. 👍
+   - `"openai_key": "MANQUANTE"` → ajoute `OPENAI_API_KEY`, puis redéploie.
+   - Clé « configurée » mais l'app dit encore « quota » → c'est le **crédit/facturation**
+     OpenAI (pas la config) : ajoute du crédit sur la **bonne organisation**.
 
 ## Ensuite : tout est automatique
 
