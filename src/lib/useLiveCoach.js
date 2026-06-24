@@ -63,7 +63,7 @@ export function useLiveCoach() {
   // ---------------------------------------------------------------------------
   //  Appel du coach (streaming + parsing partiel + mesure de latence)
   // ---------------------------------------------------------------------------
-  const runCoach = useCallback(async (hint, { fallback } = {}) => {
+  const runCoach = useCallback(async (hint, { fallback, notes } = {}) => {
     coachAbortRef.current?.abort();
     const ac = new AbortController();
     coachAbortRef.current = ac;
@@ -77,7 +77,7 @@ export function useLiveCoach() {
     setSuggestion({ phrase_a_dire: '', _complete: false });
     setLatency({ first: null, full: null });
 
-    const payload = buildPayload(turnsRef.current, businessRef.current, hint);
+    const payload = buildPayload(turnsRef.current, businessRef.current, hint, notes);
 
     try {
       let lastRaw = '';
@@ -236,6 +236,10 @@ export function useLiveCoach() {
     if (turnsRef.current.length) runCoach('Donne une formulation nettement différente.');
   }, [runCoach]);
 
+  const coachFromNotes = useCallback((notes) => {
+    if (notes?.trim()) runCoach(undefined, { notes });
+  }, [runCoach]);
+
   const reset = useCallback(() => {
     stopMic(); stopSim();
     setTurns([]); setSuggestion(null); setError(null); setInterim(null);
@@ -253,6 +257,6 @@ export function useLiveCoach() {
     // réglages
     setMode: changeMode, setBusinessType, setScenarioId,
     // actions
-    toggle, alternative, reset, talkStart, talkEnd, toggleSpeaker,
+    toggle, alternative, reset, talkStart, talkEnd, toggleSpeaker, coachFromNotes,
   };
 }

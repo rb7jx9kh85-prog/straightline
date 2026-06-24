@@ -5,6 +5,7 @@ import TranscriptFeed from './components/TranscriptFeed.jsx';
 import StatusBar from './components/StatusBar.jsx';
 import Settings from './components/Settings.jsx';
 import Motivation from './components/Motivation.jsx';
+import NotesPanel from './components/NotesPanel.jsx';
 import { useLiveCoach } from './lib/useLiveCoach.js';
 
 export default function App() {
@@ -108,6 +109,7 @@ export default function App() {
                 onScenario={c.setScenarioId}
                 running={c.running}
               />
+              <NotesPanel onCoach={c.coachFromNotes} streaming={c.streaming} />
               <TranscriptFeed turns={c.turns} interim={c.interim} />
             </div>
           </main>

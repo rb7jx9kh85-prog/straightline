@@ -50,6 +50,7 @@ export default async function handler(req) {
   const businessType = body?.business_type || 'restaurant';
   const now = body?.now || new Date().toISOString();
   const hint = typeof body?.hint === 'string' ? body.hint : '';
+  const notes = typeof body?.notes === 'string' ? body.notes.trim() : '';
 
   const model = process.env.COACH_MODEL || DEFAULT_MODEL;
   const baseURL = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
@@ -65,6 +66,12 @@ export default async function handler(req) {
     `Transcription en direct (les plus récentes en bas) :\n` +
     `${transcript || "[aucune réplique encore — le vendeur va ouvrir l'appel]"}\n\n` +
     `Donne MAINTENANT la prochaine réplique optimale pour [MOI], au format JSON strict du schéma.`;
+
+  if (notes) {
+    userContent +=
+      `\n\nNotes du vendeur sur ce prospect / cette situation :\n${notes}\n` +
+      `(Tiens compte de ces notes pour personnaliser la réponse.)`;
+  }
 
   if (hint) {
     userContent +=
