@@ -6,6 +6,7 @@ import StatusBar from './components/StatusBar.jsx';
 import Settings from './components/Settings.jsx';
 import Motivation from './components/Motivation.jsx';
 import NotesPanel from './components/NotesPanel.jsx';
+import NotesAndResponses from './components/NotesAndResponses.jsx';
 import { useLiveCoach } from './lib/useLiveCoach.js';
 
 export default function App() {
@@ -34,12 +35,15 @@ export default function App() {
         <button className={`sl-tab ${tab === 'copilote' ? 'active' : ''}`} onClick={() => setTab('copilote')}>
           🎯 Copilote
         </button>
+        <button className={`sl-tab ${tab === 'nar' ? 'active' : ''}`} onClick={() => setTab('nar')}>
+          📝 Notes & Réponses
+        </button>
         <button className={`sl-tab ${tab === 'motivation' ? 'active' : ''}`} onClick={() => setTab('motivation')}>
           🔥 Motivation
         </button>
       </nav>
 
-      {tab === 'copilote' ? (
+      {tab === 'copilote' && (
         <>
           <StatusBar status={c.status} latency={c.latency} />
 
@@ -114,9 +118,11 @@ export default function App() {
             </div>
           </main>
         </>
-      ) : (
-        <Motivation />
       )}
+
+      {tab === 'nar' && <NotesAndResponses />}
+
+      {tab === 'motivation' && <Motivation />}
 
       <footer className="sl-footer">
         Clé API côté serveur uniquement&nbsp;·&nbsp;transcription éphémère, aucun audio stocké&nbsp;·&nbsp;

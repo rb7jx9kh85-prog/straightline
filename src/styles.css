@@ -262,6 +262,90 @@ code { font-size: 0.85em; color: var(--or-pale); }
 .sl-turn-prospect .sl-turn-text { color: var(--ivoire); }
 .sl-turn-interim { opacity: 0.55; font-style: italic; }
 
+/* ---------- Notes & Réponses Conseillées ---------- */
+.sl-nar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+  margin-top: 14px;
+  flex: 1;
+}
+@media (max-width: 1000px) {
+  .sl-nar { grid-template-columns: 1fr; }
+}
+
+.sl-nar-main { display: flex; flex-direction: column; gap: 18px; }
+.sl-nar-section { display: flex; flex-direction: column; gap: 10px; }
+.sl-nar-title {
+  margin: 0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--gris);
+  font-weight: 700;
+}
+
+.sl-nar-input {
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--ivoire);
+  background: var(--noir-3);
+  border: 1px solid var(--ligne);
+  border-radius: 11px;
+  padding: 14px 15px;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+.sl-nar-input::placeholder { color: var(--gris-fonce); }
+.sl-nar-input:focus { border-color: var(--ligne-or); }
+.sl-nar-input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.sl-nar-types {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sl-nar-type {
+  flex: 1;
+  min-width: 100px;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 10px 14px;
+  border-radius: 9px;
+  cursor: pointer;
+  background: var(--carbon);
+  color: var(--ivoire-2);
+  border: 1px solid var(--ligne);
+  transition: all 0.15s;
+}
+.sl-nar-type:hover:not(:disabled) { border-color: var(--ligne-or); }
+.sl-nar-type.active { background: var(--or); color: #1a1406; border-color: transparent; }
+.sl-nar-type:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.sl-nar-actions {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.sl-nar-actions .sl-btn { flex: 1; min-width: 140px; }
+
+.sl-nar-result { display: flex; flex-direction: column; gap: 12px; }
+.sl-nar-latency {
+  margin: 0;
+  padding: 10px 14px;
+  background: rgba(95, 174, 122, 0.1);
+  border: 1px solid rgba(95, 174, 122, 0.3);
+  border-radius: 9px;
+  font-size: 0.82rem;
+  color: var(--vert);
+  text-align: center;
+}
+.sl-nar-latency strong { color: var(--vert); font-weight: 700; }
+
 /* ---------- Motivation ---------- */
 .sl-motivation { margin-top: 16px; display: flex; flex-direction: column; gap: 16px; }
 
