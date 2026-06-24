@@ -55,6 +55,7 @@ export function useLiveCoach() {
   const coachAbortRef = useRef(null);
   const simAbortRef = useRef(null);
   const pauseRef = useRef(null);
+  const utterSpeakerRef = useRef(null); // locuteur « latché » au début de l'énoncé en cours
 
   const setSpeakerSync = (sp) => { speakerRef.current = sp; setSpeaker(sp); };
   const clearPause = () => { if (pauseRef.current) { clearTimeout(pauseRef.current); pauseRef.current = null; } };
@@ -119,6 +120,7 @@ export function useLiveCoach() {
     setError(null);
     setSuggestion(null);
     setSpeakerSync('PROSPECT'); // mains-libres : on écoute le prospect par défaut
+    utterSpeakerRef.current = null;
 
     if (!micSupported) {
       setError('Reconnaissance vocale non supportée par ce navigateur — utilise Chrome, ou passe en Simulation.');
@@ -128,9 +130,16 @@ export function useLiveCoach() {
     let mic;
     try {
       mic = createMic({
-        onInterim: (text) => setInterim({ speaker: speakerRef.current, text }),
+        onInterim: (text) => {
+          // Latch le locuteur au DÉBUT de l'énoncé. Ainsi, si tu relâches « parler »
+          // pendant que Web Speech finalise encore tes mots (latence de ~200-800 ms),
+          // ils restent attribués à MOI au lieu de basculer sur PROSPECT.
+          if (!utterSpeakerRef.current) utterSpeakerRef.current = speakerRef.current;
+          setInterim({ speaker: utterSpeakerRef.current, text });
+        },
         onFinal: (text) => {
-          const sp = speakerRef.current;
+          const sp = utterSpeakerRef.current || speakerRef.current;
+          utterSpeakerRef.current = null; // énoncé terminé → le suivant re-latche
           setInterim(null);
           setTurns((prev) => pushTurn(prev, sp, text));
           if (sp === 'PROSPECT') triggerSoon(); // pause du prospect → on souffle
@@ -153,6 +162,7 @@ export function useLiveCoach() {
     micRef.current?.stop();
     micRef.current = null;
     runningRef.current = false;
+    utterSpeakerRef.current = null;
     setRunning(false);
     setStatus('idle');
     setInterim(null);
