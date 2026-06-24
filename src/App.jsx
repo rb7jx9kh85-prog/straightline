@@ -107,6 +107,10 @@ export default function App() {
                 mode={c.mode}
                 onMode={c.setMode}
                 micSupported={c.micSupported}
+                recorderSupported={c.recorderSupported}
+                isIOS={c.isIOS}
+                engine={c.engine}
+                onEngine={c.setEngine}
                 businessType={c.businessType}
                 onBusiness={c.setBusinessType}
                 scenarioId={c.scenarioId}

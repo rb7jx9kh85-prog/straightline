@@ -232,6 +232,7 @@ code { font-size: 0.85em; color: var(--or-pale); }
 .sl-settings { background: var(--noir-2); border: 1px solid var(--ligne); border-radius: var(--radius); padding: 15px; display: flex; flex-direction: column; gap: 15px; }
 .sl-set-group { display: flex; flex-direction: column; gap: 7px; }
 .sl-set-label { font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.8px; color: var(--gris); }
+.sl-set-hint { margin: 2px 0 0; font-size: 0.74rem; line-height: 1.45; color: var(--gris); }
 .sl-segmented { display: flex; gap: 6px; flex-wrap: wrap; }
 .sl-seg {
   flex: 1; min-width: 72px; min-height: 40px;

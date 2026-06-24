@@ -17,9 +17,16 @@ import { streamCoach } from './coachClient.js';
 import { parsePartial } from './partialJson.js';
 import { pushTurn, buildPayload } from './transcript.js';
 import { createMic, micSupported } from './micSpeech.js';
+import { createRecorder, recorderSupported, isIOS } from './micRecorder.js';
 import { SCENARIOS } from './simulation/scenarios.js';
 
 const TRIGGER_PAUSE_MS = 420; // silence du prospect avant de souffler la réponse
+
+// Moteur de transcription par défaut :
+//  • 'record' (enregistrement + Whisper) sur iPhone, ou si la Web Speech API
+//    n'existe pas — c'est le seul fiable là-bas.
+//  • 'speech' (Web Speech navigateur) sinon : zéro latence, gratuit (Chrome desktop).
+const DEFAULT_ENGINE = (isIOS || !micSupported) && recorderSupported ? 'record' : 'speech';
 
 const sleep = (ms, signal) =>
   new Promise((resolve, reject) => {
@@ -32,7 +39,8 @@ const sleep = (ms, signal) =>
   });
 
 export function useLiveCoach() {
-  const [mode, setMode] = useState(micSupported ? 'mic' : 'simulation');
+  const [mode, setMode] = useState(micSupported || recorderSupported ? 'mic' : 'simulation');
+  const [engine, setEngine] = useState(DEFAULT_ENGINE); // 'speech' | 'record'
   const [businessType, setBusinessType] = useState('restaurant');
   const [scenarioId, setScenarioId] = useState(SCENARIOS[0].id);
 
@@ -56,6 +64,7 @@ export function useLiveCoach() {
   const simAbortRef = useRef(null);
   const pauseRef = useRef(null);
   const utterSpeakerRef = useRef(null); // locuteur « latché » au début de l'énoncé en cours
+  const engineRef = useRef(engine); engineRef.current = engine;
 
   const setSpeakerSync = (sp) => { speakerRef.current = sp; setSpeaker(sp); };
   const clearPause = () => { if (pauseRef.current) { clearTimeout(pauseRef.current); pauseRef.current = null; } };
@@ -113,17 +122,62 @@ export function useLiveCoach() {
     pauseRef.current = setTimeout(() => { pauseRef.current = null; runCoach(); }, TRIGGER_PAUSE_MS);
   }, [runCoach]);
 
+  // Quand un segment / énoncé est transcrit : on l'attribue au locuteur latché
+  // (push-to-talk) et, si c'est le PROSPECT, on déclenche le coach après la pause.
+  const onFinalText = useCallback((text) => {
+    const sp = utterSpeakerRef.current || speakerRef.current;
+    utterSpeakerRef.current = null; // énoncé terminé → le suivant re-latche
+    setInterim(null);
+    setTurns((prev) => pushTurn(prev, sp, text));
+    if (sp === 'PROSPECT') triggerSoon();
+  }, [triggerSoon]);
+
   // ---------------------------------------------------------------------------
-  //  Mode micro (Web Speech)
+  //  Mode micro — 2 moteurs de transcription
+  //   • 'record' : MediaRecorder + Whisper (/api/transcribe). Marche sur iPhone.
+  //   • 'speech' : Web Speech API du navigateur (Chrome desktop). Zéro latence.
   // ---------------------------------------------------------------------------
-  const startMic = useCallback(() => {
+  const startMic = useCallback(async () => {
     setError(null);
     setSuggestion(null);
     setSpeakerSync('PROSPECT'); // mains-libres : on écoute le prospect par défaut
     utterSpeakerRef.current = null;
 
+    const useRecord = engineRef.current === 'record';
+
+    // --- Moteur enregistrement (iPhone & co) ----------------------------------
+    if (useRecord) {
+      if (!recorderSupported) {
+        setError("Enregistrement non supporté ici. Essaie un autre navigateur, ou passe en Simulation.");
+        return;
+      }
+      let mic;
+      try {
+        mic = await createRecorder({
+          // début d'une prise de parole → latch le locuteur + indicateur visuel
+          // (Whisper ne streame pas les mots, on montre au moins que ça capte).
+          onSpeechStart: () => {
+            if (!utterSpeakerRef.current) utterSpeakerRef.current = speakerRef.current;
+            setInterim({ speaker: utterSpeakerRef.current, text: 'transcription' });
+          },
+          onText: onFinalText,
+          onError: (msg) => setError(typeof msg === 'string' ? msg : 'erreur micro'),
+        });
+        mic.start();
+      } catch (e) {
+        setError(e.message || String(e));
+        return;
+      }
+      micRef.current = mic;
+      runningRef.current = true;
+      setRunning(true);
+      setStatus('listening');
+      return;
+    }
+
+    // --- Moteur Web Speech (Chrome desktop) -----------------------------------
     if (!micSupported) {
-      setError('Reconnaissance vocale non supportée par ce navigateur — utilise Chrome, ou passe en Simulation.');
+      setError('Reconnaissance vocale du navigateur non supportée ici. Bascule sur « Enregistrement » (iPhone), ou passe en Simulation.');
       return;
     }
 
@@ -137,13 +191,7 @@ export function useLiveCoach() {
           if (!utterSpeakerRef.current) utterSpeakerRef.current = speakerRef.current;
           setInterim({ speaker: utterSpeakerRef.current, text });
         },
-        onFinal: (text) => {
-          const sp = utterSpeakerRef.current || speakerRef.current;
-          utterSpeakerRef.current = null; // énoncé terminé → le suivant re-latche
-          setInterim(null);
-          setTurns((prev) => pushTurn(prev, sp, text));
-          if (sp === 'PROSPECT') triggerSoon(); // pause du prospect → on souffle
-        },
+        onFinal: onFinalText,
         onError: (msg) => setError(typeof msg === 'string' ? msg : 'erreur micro'),
       });
       mic.start();
@@ -155,7 +203,7 @@ export function useLiveCoach() {
     runningRef.current = true;
     setRunning(true);
     setStatus('listening');
-  }, [triggerSoon]);
+  }, [triggerSoon, onFinalText]);
 
   const stopMic = useCallback(() => {
     clearPause();
@@ -247,15 +295,16 @@ export function useLiveCoach() {
   }, [stopMic, stopSim]);
 
   const changeMode = useCallback((m) => { if (!runningRef.current) setMode(m); }, []);
+  const changeEngine = useCallback((e) => { if (!runningRef.current) setEngine(e); }, []);
 
   useEffect(() => () => { micRef.current?.stop(); simAbortRef.current?.abort(); }, []);
 
   return {
     // état
-    mode, businessType, scenarioId, status, running, turns, interim, speaker,
-    suggestion, streaming, error, latency, micSupported,
+    mode, engine, businessType, scenarioId, status, running, turns, interim, speaker,
+    suggestion, streaming, error, latency, micSupported, recorderSupported, isIOS,
     // réglages
-    setMode: changeMode, setBusinessType, setScenarioId,
+    setMode: changeMode, setEngine: changeEngine, setBusinessType, setScenarioId,
     // actions
     toggle, alternative, reset, talkStart, talkEnd, toggleSpeaker, coachFromNotes,
   };

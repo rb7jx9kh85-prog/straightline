@@ -81,11 +81,18 @@ automatiquement le coach : la phrase à dire s'écrit en direct. **Mains-libres*
 pendant que le prospect parle. Quand c'est ton tour, **maintiens le bouton « parler »** (ta voix
 est alors étiquetée `MOI` et ne déclenche pas de suggestion).
 
-Deux modes seulement (base volontairement simple, `src/lib/`) :
+Deux modes (base volontairement simple, `src/lib/`) :
 
-- **Live · micro** — reconnaissance vocale du navigateur (Chrome/Edge), français, **zéro clé**,
-  éphémère. Mets le call sur **haut-parleur** : le micro capte les deux voix. Tu maintiens le bouton
-  **« PARLER »** quand c'est ton tour (ta voix est étiquetée `MOI` et ne déclenche pas de réponse).
+- **Live · micro** — mets le call sur **haut-parleur**, le micro capte les deux voix. Tu maintiens le
+  bouton **« PARLER »** quand c'est ton tour (ta voix est étiquetée `MOI` et ne déclenche pas de
+  réponse). Deux **moteurs de transcription** (réglable, auto-détecté) :
+  - **📱 Enregistrement** *(défaut sur iPhone)* — MediaRecorder + **Whisper** (`/api/transcribe`).
+    L'audio est découpé par segments dès une pause, transcrit côté serveur, puis **jeté** (éphémère).
+    Le seul fiable sur **iPhone/Safari**, où la Web Speech API ne marche pas.
+  - **💻 Navigateur** *(défaut sur Chrome desktop)* — Web Speech API, **zéro latence, zéro clé**.
+    Instantané mais **indisponible sur iPhone**.
+  > ⚠️ iOS ne donne **pas** l'audio d'un appel téléphonique au navigateur. D'où le **haut-parleur** :
+  > le micro de l'iPhone capte la conversation dans la pièce. (Ou lance l'app sur un 2ᵉ appareil.)
 - **Simulation** — rejoue des scénarios d'objections. Idéal pour tester latence + qualité. Si l'API
   OpenAI ne répond pas (quota dépassé, clé sans crédit, hors-ligne…), l'app bascule automatiquement
   sur les **cartes de conseil pré-écrites** du scénario (badge « démo hors-ligne ») : la démo reste
