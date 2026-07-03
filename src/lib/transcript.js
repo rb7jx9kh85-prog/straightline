@@ -11,7 +11,7 @@ export function pushTurn(turns, speaker, text, t) {
 }
 
 // Construit le payload envoyé à /api/coach (schéma section 5), horodaté relatif.
-export function buildPayload(turns, businessType, hint, notes) {
+export function buildPayload(turns, businessType, hint, notes, callId) {
   const t0 = turns.length ? turns[0].t : 0;
   return {
     now: new Date().toISOString(),
@@ -23,5 +23,6 @@ export function buildPayload(turns, businessType, hint, notes) {
     })),
     ...(hint ? { hint } : {}),
     ...(notes ? { notes } : {}),
+    ...(callId ? { call_id: callId } : {}),
   };
 }
