@@ -8,8 +8,9 @@
 //                    échoue, on affiche la carte pré-écrite du scénario.
 //
 //  Flux mic : Web Speech → transcript roulant [MOI]/[PROSPECT]
-//             → pause du prospect (~420 ms) → POST /api/coach (stream)
-//             → carte de conseil qui s'écrit en direct + latence mesurée.
+//             → dès que le prospect s'arrête (fin d'énoncé détectée par le
+//               moteur de reconnaissance) → POST /api/coach (stream), quasi
+//               immédiat → carte de conseil qui s'écrit en direct + latence mesurée.
 // =============================================================================
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -20,7 +21,11 @@ import { createMic, micSupported } from './micSpeech.js';
 import { createRecorder, recorderSupported, isIOS } from './micRecorder.js';
 import { SCENARIOS } from './simulation/scenarios.js';
 
-const TRIGGER_PAUSE_MS = 420; // silence du prospect avant de souffler la réponse
+// Le moteur de transcription (Web Speech / Whisper) a déjà attendu un silence
+// pour finaliser l'énoncé du prospect : on n'ajoute plus de pause artificielle
+// avant d'appeler OpenAI. Ce délai minime évite juste d'envoyer 2 requêtes si
+// le moteur émet deux évènements « final » dans le même instant.
+const TRIGGER_PAUSE_MS = 30;
 
 // Moteur de transcription par défaut :
 //  • 'record' (enregistrement + Whisper) sur iPhone, ou si la Web Speech API
