@@ -65,6 +65,11 @@ export function useLiveCoach() {
   const pauseRef = useRef(null);
   const utterSpeakerRef = useRef(null); // locuteur « latché » au début de l'énoncé en cours
   const engineRef = useRef(engine); engineRef.current = engine;
+  // Clé stable pour tout l'appel en cours : permet à OpenAI de router les requêtes
+  // successives vers le même cache de prompt (le gros system prompt Straight Line
+  // reste « chaud » d'un tour à l'autre → 1er token nettement plus rapide).
+  const callIdRef = useRef(null);
+  const newCallId = () => `sl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
   const setSpeakerSync = (sp) => { speakerRef.current = sp; setSpeaker(sp); };
   const clearPause = () => { if (pauseRef.current) { clearTimeout(pauseRef.current); pauseRef.current = null; } };
@@ -86,7 +91,8 @@ export function useLiveCoach() {
     setSuggestion({ phrase_a_dire: '', _complete: false });
     setLatency({ first: null, full: null });
 
-    const payload = buildPayload(turnsRef.current, businessRef.current, hint, notes);
+    if (!callIdRef.current) callIdRef.current = newCallId();
+    const payload = buildPayload(turnsRef.current, businessRef.current, hint, notes, callIdRef.current);
 
     try {
       let lastRaw = '';
@@ -142,6 +148,7 @@ export function useLiveCoach() {
     setSuggestion(null);
     setSpeakerSync('PROSPECT'); // mains-libres : on écoute le prospect par défaut
     utterSpeakerRef.current = null;
+    callIdRef.current = newCallId(); // nouvel appel → nouvelle clé de cache prompt
 
     const useRecord = engineRef.current === 'record';
 
@@ -216,10 +223,9 @@ export function useLiveCoach() {
     setInterim(null);
   }, []);
 
-  // Push-to-talk : maintiens pour parler (= MOI), relâche → on réécoute le prospect.
-  const talkStart = useCallback(() => { clearPause(); setSpeakerSync('MOI'); }, []);
-  const talkEnd = useCallback(() => { setSpeakerSync('PROSPECT'); }, []);
+  // Locuteur : la touche M (ou le bouton) fixe qui parle jusqu'au prochain appui.
   const toggleSpeaker = useCallback(() => {
+    clearPause();
     setSpeakerSync(speakerRef.current === 'MOI' ? 'PROSPECT' : 'MOI');
   }, []);
 
@@ -231,6 +237,7 @@ export function useLiveCoach() {
     setBusinessType(scenario.business_type);
     businessRef.current = scenario.business_type;
     setTurns([]); setSuggestion(null); setError(null); setInterim(null);
+    callIdRef.current = newCallId();
 
     const ac = new AbortController();
     simAbortRef.current = ac;
@@ -306,6 +313,6 @@ export function useLiveCoach() {
     // réglages
     setMode: changeMode, setEngine: changeEngine, setBusinessType, setScenarioId,
     // actions
-    toggle, alternative, reset, talkStart, talkEnd, toggleSpeaker, coachFromNotes,
+    toggle, alternative, reset, toggleSpeaker, coachFromNotes,
   };
 }

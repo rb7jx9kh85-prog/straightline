@@ -51,19 +51,16 @@ export default function App() {
             <div className="sl-left">
               <CoachCard suggestion={c.suggestion} streaming={c.streaming} status={c.status} error={c.error} />
 
-              {/* GROS bouton PARLER (push-to-talk) — visible pendant l'écoute micro */}
+              {/* Bouton locuteur — un clic (ou la touche M) fixe qui parle jusqu'au prochain clic */}
               {!isSim && c.running && (
                 <button
                   className={`sl-ptt ${c.speaker === 'MOI' ? 'on' : ''}`}
-                  onPointerDown={c.talkStart}
-                  onPointerUp={c.talkEnd}
-                  onPointerLeave={c.talkEnd}
-                  onContextMenu={(e) => e.preventDefault()}
+                  onClick={c.toggleSpeaker}
                 >
                   <span className="sl-ptt-icon" aria-hidden="true">{c.speaker === 'MOI' ? '🔴' : '🎙️'}</span>
-                  <span className="sl-ptt-main">{c.speaker === 'MOI' ? 'TU PARLES…' : 'MAINTENIR POUR PARLER'}</span>
+                  <span className="sl-ptt-main">{c.speaker === 'MOI' ? 'C\'EST TOI QUI PARLES' : 'J\'ÉCOUTE LE PROSPECT'}</span>
                   <span className="sl-ptt-sub">
-                    {c.speaker === 'MOI' ? 'relâche dès que tu as fini' : "garde le doigt appuyé quand c'est à toi de parler"}
+                    Appuie sur <kbd>M</kbd> (ou ce bouton) quand {c.speaker === 'MOI' ? 'ton prospect reprend la parole' : "c'est ton tour de parler"}
                   </span>
                 </button>
               )}
@@ -90,15 +87,15 @@ export default function App() {
               {!isSim && (
                 <p className="sl-hint-live">
                   🎧 Mains-libres : mets l'appel sur <strong>haut-parleur</strong>, je transcris le prospect et
-                  te souffle la réponse <strong>dès qu'il fait une pause</strong>. Quand c'est ton tour,
-                  <strong> maintiens « PARLER »</strong> (ta voix n'est pas prise pour une objection).
-                  Rien n'est enregistré — transcription éphémère.
+                  te souffle la réponse <strong>dès qu'il fait une pause</strong>. Appuie sur <strong><kbd>M</kbd></strong> quand
+                  c'est toi qui parles — ça reste fixé sur toi jusqu'à ce que tu ré-appuies sur <strong><kbd>M</kbd></strong> pour
+                  redonner la parole au prospect. Rien n'est enregistré — transcription éphémère.
                 </p>
               )}
 
               <p className="sl-shortcuts">
                 <kbd>Espace</kbd> démarrer/arrêter&nbsp;·&nbsp;<kbd>→</kbd> alternative
-                {!isSim && <>&nbsp;·&nbsp;<kbd>M</kbd> locuteur</>}
+                {!isSim && <>&nbsp;·&nbsp;<kbd>M</kbd> qui parle (toi / prospect)</>}
               </p>
             </div>
 

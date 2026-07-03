@@ -51,6 +51,7 @@ export default async function handler(req) {
   const now = body?.now || new Date().toISOString();
   const hint = typeof body?.hint === 'string' ? body.hint : '';
   const notes = typeof body?.notes === 'string' ? body.notes.trim() : '';
+  const callId = typeof body?.call_id === 'string' ? body.call_id.slice(0, 64) : '';
 
   const model = process.env.COACH_MODEL || DEFAULT_MODEL;
   const baseURL = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
@@ -91,8 +92,15 @@ export default async function handler(req) {
         temperature: 0.55,
         stream: true,
         response_format: { type: 'json_object' },
+        // `prompt_cache_key` : route les tours successifs du MÊME appel vers le
+        // même cache de prompt OpenAI, pour que le gros system prompt (~2 500
+        // tokens, Straight Line complet) reste "chaud" d'un tour à l'autre →
+        // 1er token nettement plus rapide sans rien changer à la qualité de
+        // la réponse (contrairement à `cache_control`, propre à Anthropic et
+        // sans effet ici, qu'il remplace).
+        ...(callId ? { prompt_cache_key: callId } : {}),
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
+          { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userContent },
         ],
       }),
